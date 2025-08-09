@@ -27,8 +27,8 @@ jobs:
 
     - name: Commit and push changes
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --local user.email "andreu.soler.8@gmail.com"
+        git config --local user.name "andreusoler8"
         git add calendari_basket_almeda.ics
         git commit -m "Actualitza calendari automàticament" || echo "No hi ha canvis"
         git push
