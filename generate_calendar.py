@@ -18,17 +18,19 @@ def fetch_matches(url):
         page = browser.new_page()
 
         print(f"Carregant: {url}")
-        page.goto(url, timeout=60000)
-
-        # Esperar que la taula carregui
-        page.wait_for_selector("table")
-
-        rows = page.query_selector_all("table tr")
+        page.goto(url, timeout=60000, wait_until="networkidle")
+        page.wait_for_timeout(3000)
+        
+        # Esperar explícitament la taula amb retry
+        page.wait_for_selector("table", timeout=15000)
+        
+        # IMPORTANT: tornar a agafar la pàgina després de càrrega completa
+        rows = page.locator("table tr").all()
 
         current_date = None
 
         for row in rows:
-            cols = [c.inner_text().strip() for c in row.query_selector_all("td")]
+            cols = [c.inner_text().strip() for c in row.locator("td").all()]
 
             if not cols:
                 continue
