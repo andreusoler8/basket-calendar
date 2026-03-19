@@ -2,8 +2,11 @@ name: Generate ICS calendar
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # Cada dia a les 6 del matí UTC
+    - cron: '0 6 * * *'
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
@@ -20,15 +23,21 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests beautifulsoup4
+        pip install playwright
+
+    - name: Install Playwright browsers
+      run: playwright install chromium
 
     - name: Run script
       run: python generate_calendar.py
 
     - name: Commit and push changes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        git config --local user.email "andreu.soler.8@gmail.com"
-        git config --local user.name "andreusoler8"
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
         git add calendari_basket_almeda.ics
         git commit -m "Actualitza calendari automàticament" || echo "No hi ha canvis"
-        git push
+        git push origin HEAD:main
