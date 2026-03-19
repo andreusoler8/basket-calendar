@@ -11,48 +11,39 @@ URLS = [
 ]
 
 def fetch_matches(url):
+    # Extreure ID final de la URL
+    team_id = url.split("/")[-1]
+
+    api_url = f"https://www.basquetcatala.cat/api/partits/calendari_equip_global/{team_id}"
+
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        "Accept-Language": "ca-ES,ca;q=0.9,en;q=0.8",
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json"
     }
 
-    resp = requests.get(url, headers=headers)
+    resp = requests.get(api_url, headers=headers)
     resp.raise_for_status()
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    data = resp.json()
 
     matches = []
-    rows = soup.find_all("tr")
 
-    current_date = None
+    for item in data.get("data", []):
+        try:
+            date_str = item.get("data")  # format: "06/09/2025"
+            time_str = item.get("hora")  # "16:45"
 
-    for row in rows:
-        cols = [c.get_text(strip=True) for c in row.find_all("td")]
+            home = item.get("equip_local")
+            away = item.get("equip_visitant")
+            categoria = item.get("competicio")
+            location = item.get("camp")
 
-        if not cols:
-            continue
-
-        # Detectar files amb només la data
-        if len(cols) == 1 and "/" in cols[0]:
-            current_date = cols[0]
-            continue
-
-        # Files amb dades de partit
-        if len(cols) >= 5 and current_date:
-            try:
-                hora = cols[1]
-                local = cols[2]
-                visitant = cols[3]
-                categoria = cols[4]
-                lloc = cols[5] if len(cols) > 5 else ""
-
-                matches.append((current_date, hora, local, visitant, categoria, lloc))
-            except Exception as e:
-                print("Error processant fila:", cols)
-                continue
+            if date_str and time_str:
+                matches.append((date_str, time_str, home, away, categoria, location))
+        except Exception as e:
+            print("Error parsejant:", item)
 
     return matches
-
 
 def generate_ics(matches, output_path):
     def format_dt(dt):
