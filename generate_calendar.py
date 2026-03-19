@@ -1,8 +1,7 @@
-import requests
-from bs4 import BeautifulSoup
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
-import time
+from playwright.sync_api import sync_playwright
 
 # URLs dels calendaris
 URLS = [
@@ -10,40 +9,53 @@ URLS = [
     "https://www.basquetcatala.cat/partits/calendari_equip_global/53/79640",
 ]
 
+
 def fetch_matches(url):
-    # Extreure ID final de la URL
-    team_id = url.split("/")[-1]
-
-    api_url = f"https://www.basquetcatala.cat/api/partits/calendari_equip_global/{team_id}"
-
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json"
-    }
-
-    resp = requests.get(api_url, headers=headers)
-    resp.raise_for_status()
-
-    data = resp.json()
-
     matches = []
 
-    for item in data.get("data", []):
-        try:
-            date_str = item.get("data")  # format: "06/09/2025"
-            time_str = item.get("hora")  # "16:45"
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
 
-            home = item.get("equip_local")
-            away = item.get("equip_visitant")
-            categoria = item.get("competicio")
-            location = item.get("camp")
+        print(f"Carregant: {url}")
+        page.goto(url, timeout=60000)
 
-            if date_str and time_str:
-                matches.append((date_str, time_str, home, away, categoria, location))
-        except Exception as e:
-            print("Error parsejant:", item)
+        # Esperar que la taula carregui
+        page.wait_for_selector("table")
 
+        rows = page.query_selector_all("table tr")
+
+        current_date = None
+
+        for row in rows:
+            cols = [c.inner_text().strip() for c in row.query_selector_all("td")]
+
+            if not cols:
+                continue
+
+            # Files amb data
+            if len(cols) == 1 and "/" in cols[0]:
+                current_date = cols[0]
+                continue
+
+            # Files amb partits
+            if len(cols) >= 5 and current_date:
+                try:
+                    hora = cols[1]
+                    local = cols[2]
+                    visitant = cols[3]
+                    categoria = cols[4]
+                    lloc = cols[5] if len(cols) > 5 else ""
+
+                    matches.append((current_date, hora, local, visitant, categoria, lloc))
+                except:
+                    continue
+
+        browser.close()
+
+    print(f"Partits trobats: {len(matches)}")
     return matches
+
 
 def generate_ics(matches, output_path):
     def format_dt(dt):
@@ -86,12 +98,9 @@ if __name__ == "__main__":
     all_matches = []
 
     for url in URLS:
-        print(f"Carregant: {url}")
         matches = fetch_matches(url)
-        print(f"Partits trobats: {len(matches)}")
         all_matches.extend(matches)
-
-        time.sleep(2)  # Evitar bloquejos
+        time.sleep(2)
 
     print(f"TOTAL PARTITS: {len(all_matches)}")
 
